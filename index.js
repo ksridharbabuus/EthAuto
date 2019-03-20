@@ -1,13 +1,23 @@
-let contractJSON = require('./contracts/SimpleStorage.json')
+let AGITokenAbi = require("singularitynet-token-contracts/abi/SingularityNetToken.json");
+let MPEAbi = require("singularitynet-platform-contracts/abi/MultiPartyEscrow.json")
+let RegistryAbi = require("singularitynet-platform-contracts/abi/Registry.json")
+
+let contractJSON = "" //require('./contracts/SimpleStorage.json')
 var Web3 = require('web3')
 const Tx = require('ethereumjs-tx');
 //import {Eth} from 'web3-eth';
 
+// Ropsten Address
+// let AGITokenAddress = "0xb97E9bBB6fd49865709d3F1576e8506ad640a13B" 
+// let MPEAddress = "0x7e6366fbe3bdfce3c906667911fc5237cc96bd08"
+// let RegistryAddress = "0x5156fde2ca71da4398f8c76763c41bc9633875e4"
+
+
 function main() {
 
-    const pk = '0xb0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773';
-    const pk1 = 'b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773';
-    //0x348ce564d427a3311b6536bbcff9390d69395b06ed6c486954e971d960fe8709
+    // Ropsten Keys
+    // const pk = ""
+    // const pk1 = ""
 
     console.log("initiating the script for automation...")
 
@@ -24,7 +34,7 @@ function main() {
     
     
     const web3 = new Web3('http://localhost:8545');
-    //const web3 = new Web3('http://ropsten.infura.io');
+    //const web3 = new Web3('https://ropsten.infura.io');
 
 console.log("Current Provider - " + web3.currentProvider)
 
@@ -39,17 +49,19 @@ console.log("Current Provider - " + web3.currentProvider)
             console.log("Eth Balance - " + bal);
     })
 
-    var newAccount = createAccount(web3)
+    approveToken(web3, 100000000000, pk1)
 
-    // Transfer 1 Eth to newly created acount
-    transferEther(web3, 1000000000000000000, pk1, newAccount.address);
+    // var newAccount = createAccount(web3)
 
-    validateAndSetDefaultAccount(web3, newAccount.privateKey)
+    // // Transfer 1 Eth to newly created acount
+    // transferEther(web3, 1000000000000000000, pk1, newAccount.address);
 
-    // Functions to inteface with Contracts
-    readFromContract(web3)
+    // validateAndSetDefaultAccount(web3, newAccount.privateKey)
 
-    writeToContract(web3)
+    // // Functions to inteface with Contracts
+    // readFromContract(web3)
+
+    // writeToContract(web3)
     
 }
 
@@ -57,8 +69,7 @@ function validateAndSetDefaultAccount(web3, pk) {
 
     var account = web3.eth.accounts.privateKeyToAccount(pk);
 
-    console.log("current address - " + account.address )
-    console.log("current privateKey  - " + account.privateKey )
+    console.log("setting Deault Account to " + account.address )
 
     web3.eth.defaultAccount = account.address;
 
@@ -123,6 +134,7 @@ function transferEther(web3, weiAmount, fromAccount_pk, toAccount) {
 
     var account = web3.eth.accounts.privateKeyToAccount('0x' + fromAccount_pk);
     var nonce ;
+
     web3.eth.getTransactionCount(account.address).then((_nonce) => {
         console.log("nonce - " + _nonce);
         nonce = _nonce
@@ -145,12 +157,66 @@ function transferEther(web3, weiAmount, fromAccount_pk, toAccount) {
         
             web3.eth.sendSignedTransaction('0x' + serializedTx.toString('hex'))
             .on('receipt', console.log);
+            
+    })    
+}
 
+function getMPEBalance() {
 
-    })
+}
 
-
+function createChannel() {
     
+}
+
+async function approveToken(web3, weiAmount, fromAccount_pk) {
+
+    var account = web3.eth.accounts.privateKeyToAccount("0x" + fromAccount_pk);
+    var TokenContract = new web3.eth.Contract(AGITokenAbi, AGITokenAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
+
+    const privateKey = new Buffer(fromAccount_pk, 'hex')
+
+    TokenContract.methods.balanceOf(web3.eth.defaultAccount).call({from: web3.eth.defaultAccount}, (error, result) => {
+        console.log("token balance - " + result);
+    });
+
+    console.log("account.address - " +  account.address)
+
+    const query = TokenContract.methods.approve(MPEAddress, weiAmount);
+    const encodedABI = query.encodeABI();
+
+    web3.eth.getTransactionCount(account.address).then((_nonce) => {
+        console.log("nonce - " + _nonce);
+        nonce = _nonce
+
+        const rawTx = {
+            nonce: nonce,
+            gasPrice: "0x098bca5a00",
+            gasLimit: 2100000,
+            to: AGITokenAddress,
+            value: 0,
+            data: encodedABI,
+            }
+
+            const tx = new Tx(rawTx);
+            tx.sign(privateKey);
+        
+            const serializedTx = tx.serialize();
+        
+            console.log("serializedTx - " + serializedTx.toString('hex'));
+        
+            web3.eth.sendSignedTransaction('0x' + serializedTx.toString('hex'))
+            .on('receipt', console.log)
+            .catch((err) => {console.log("Error - " + err)})
+    }) 
+
+
+
+}
+
+function depositToken(web3) {
+
+
 }
 
 main();
