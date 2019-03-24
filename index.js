@@ -1,23 +1,27 @@
 let AGITokenAbi = require("singularitynet-token-contracts/abi/SingularityNetToken.json");
 let MPEAbi = require("singularitynet-platform-contracts/abi/MultiPartyEscrow.json")
 let RegistryAbi = require("singularitynet-platform-contracts/abi/Registry.json")
+var ipfsClient = require('ipfs-http-client')
+
+var async = require("async");
 
 let contractJSON = "" //require('./contracts/SimpleStorage.json')
 var Web3 = require('web3')
 const Tx = require('ethereumjs-tx');
+
 //import {Eth} from 'web3-eth';
 
 // Ropsten Address
-// let AGITokenAddress = "0xb97E9bBB6fd49865709d3F1576e8506ad640a13B" 
-// let MPEAddress = "0x7e6366fbe3bdfce3c906667911fc5237cc96bd08"
-// let RegistryAddress = "0x5156fde2ca71da4398f8c76763c41bc9633875e4"
+let AGITokenAddress = "0xb97E9bBB6fd49865709d3F1576e8506ad640a13B" 
+let MPEAddress = "0x7e6366fbe3bdfce3c906667911fc5237cc96bd08"
+let RegistryAddress = "0x5156fde2ca71da4398f8c76763c41bc9633875e4"
 
 
-function main() {
+async function main() {
 
     // Ropsten Keys
-    // const pk = ""
-    // const pk1 = ""
+    const pk = ""
+    const pk1 = ""
 
     console.log("initiating the script for automation...")
 
@@ -33,8 +37,8 @@ function main() {
     // }
     
     
-    const web3 = new Web3('http://localhost:8545');
-    //const web3 = new Web3('https://ropsten.infura.io');
+    //const web3 = new Web3('http://localhost:8545');
+    const web3 = new Web3('https://ropsten.infura.io');
 
 console.log("Current Provider - " + web3.currentProvider)
 
@@ -49,7 +53,12 @@ console.log("Current Provider - " + web3.currentProvider)
             console.log("Eth Balance - " + bal);
     })
 
-    approveToken(web3, 100000000000, pk1)
+
+    await getOrgServices(web3);
+
+    console.log("Data Loaded Successfully...")
+
+    //approveToken(web3, 100000000000, pk1)
 
     // var newAccount = createAccount(web3)
 
@@ -58,9 +67,13 @@ console.log("Current Provider - " + web3.currentProvider)
 
     // validateAndSetDefaultAccount(web3, newAccount.privateKey)
 
-    // // Functions to inteface with Contracts
-    // readFromContract(web3)
 
+
+
+
+    //********************************************************************************************* */
+    // Sample Functions to inteface with Contracts
+    // readFromContract(web3)
     // writeToContract(web3)
     
 }
@@ -100,31 +113,7 @@ function createAccount(web3) {
 
 }
 
-function readFromContract(web3) {
-    console.log("web3.eth.defaultAccount - " + web3.eth.defaultAccount)
-    const simpleStorageContractAddress = "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24"
-    var simpleStorageContract = new web3.eth.Contract(contractJSON.abi, simpleStorageContractAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
 
-    console.log("simpleStorageContract - " + simpleStorageContract)
-
-    simpleStorageContract.methods.storedData().call({from: web3.eth.defaultAccount}, (error, result) => {
-        console.log("result - " + result);
-    });
-}
-
-function writeToContract(web3) {
-
-    console.log("web3.eth.defaultAccount - " + web3.eth.defaultAccount)
-    const simpleStorageContractAddress = "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24"
-    var simpleStorageContract = new web3.eth.Contract(contractJSON.abi, simpleStorageContractAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
-
-    console.log("simpleStorageContract - " + simpleStorageContract)
-
-    simpleStorageContract.methods.set(123).send({from: web3.eth.defaultAccount})
-    .on('transactionHash', (hash) => { console.log("hash - " + hash)})
-    .on('receipt', (receipt) => { console.log("receipt - " + receipt)})
-
-}
 
 function transferEther(web3, weiAmount, fromAccount_pk, toAccount) {
 
@@ -159,6 +148,102 @@ function transferEther(web3, weiAmount, fromAccount_pk, toAccount) {
             .on('receipt', console.log);
             
     })    
+}
+
+
+async function getOrgnizations(web3) {
+
+    var RegistryContract = new web3.eth.Contract(RegistryAbi, RegistryAddress, {from: web3.eth.defaultAccount});
+
+    const orgIds = (await RegistryContract.methods.listOrganizations.call())
+    
+    return orgIds;
+
+}
+
+async function getOrganizationServices(web3, orgId) {
+
+    var RegistryContract = new web3.eth.Contract(RegistryAbi, RegistryAddress, {from: web3.eth.defaultAccount});
+
+    const service = await RegistryContract.methods.listServicesForOrganization(orgId).call()
+    
+    return service.serviceIds;
+}
+
+async function getServiceDetails(web3, orgId, serviceId) {
+
+    var RegistryContract = new web3.eth.Contract(RegistryAbi, RegistryAddress, {from: web3.eth.defaultAccount});
+
+    const serviceDetails = await RegistryContract.methods.getServiceRegistrationById(orgId, serviceId).call()
+    
+    return serviceDetails;
+}
+
+async function getOrgServices(web3) {
+
+    var RegistryContract = new web3.eth.Contract(RegistryAbi, RegistryAddress, {from: web3.eth.defaultAccount});
+
+    //var orgId  = "0x736e657400000000000000000000000000000000000000000000000000000000"
+
+    const orgIds = await getOrgnizations(web3)
+    
+    await async.forEach(orgIds, async (orgId) => {
+
+        //console.log("Organization Id - " + orgId)
+        //console.log("---------------------------")
+
+        const serviceIds = await getOrganizationServices(web3, orgId)
+
+        //console.log("Service call...")
+
+        await async.forEach(serviceIds, async (serviceId) => { 
+
+            //console.log("service Id - " + serviceId)
+
+            const serviceDetails = await getServiceDetails(web3,orgId, serviceId)
+
+            //console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
+            //console.log("***********************")
+
+            var ipfsHash = web3.utils.hexToUtf8(serviceDetails.metadataURI).replace("ipfs://", "");
+
+            var dataJSON = await getMetaDataFromIPFS(ipfsHash)
+
+            console.log("payment_address - " + dataJSON.display_name);
+
+        });
+
+
+    }); // For each Org Id
+
+    console.log("End of the Function call....")
+    
+}
+
+async function getMetaDataFromIPFS(_ipfshash) {
+
+    var ipfs  = ipfsClient({ host: '', port: 80, protocol: 'http' });
+    
+    var dataJSON = null;
+
+    await ipfs.get(_ipfshash.trim(), async function (err, files) {
+
+        if(files) {
+
+             await files.forEach( async (file) => {
+
+                var resString = file.content.toString('utf8')
+                //console.log("resString - " + resString) 
+                dataJSON = JSON.parse(resString)
+
+                const paymentAddress = dataJSON.groups[0].payment_address
+                const serviceName = dataJSON.display_name
+
+            })
+        }
+        return dataJSON;   
+    })
+
 }
 
 function getMPEBalance() {
@@ -210,13 +295,42 @@ async function approveToken(web3, weiAmount, fromAccount_pk) {
             .catch((err) => {console.log("Error - " + err)})
     }) 
 
-
-
 }
 
 function depositToken(web3) {
 
 
 }
+
+
+
+//***********************************to be removed ********************************************************** */
+
+// function readFromContract(web3) {
+//     console.log("web3.eth.defaultAccount - " + web3.eth.defaultAccount)
+//     const simpleStorageContractAddress = "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24"
+//     var simpleStorageContract = new web3.eth.Contract(contractJSON.abi, simpleStorageContractAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
+
+//     console.log("simpleStorageContract - " + simpleStorageContract)
+
+//     simpleStorageContract.methods.storedData().call({from: web3.eth.defaultAccount}, (error, result) => {
+//         console.log("result - " + result);
+//     });
+// }
+
+// function writeToContract(web3) {
+
+//     console.log("web3.eth.defaultAccount - " + web3.eth.defaultAccount)
+//     const simpleStorageContractAddress = "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24"
+//     var simpleStorageContract = new web3.eth.Contract(contractJSON.abi, simpleStorageContractAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
+
+//     console.log("simpleStorageContract - " + simpleStorageContract)
+
+//     simpleStorageContract.methods.set(123).send({from: web3.eth.defaultAccount})
+//     .on('transactionHash', (hash) => { console.log("hash - " + hash)})
+//     .on('receipt', (receipt) => { console.log("receipt - " + receipt)})
+
+// }
+
 
 main();
