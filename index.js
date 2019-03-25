@@ -54,7 +54,10 @@ console.log("Current Provider - " + web3.currentProvider)
     })
 
 
-    await getOrgServices(web3);
+    await loadOrgServices(web3);
+
+    //await getMetaDataFromIPFS("QmRhhwQaUMrkEiLF8ysNQRojoBgUL6muTLAfFXhXaneQvS")
+
 
     console.log("Data Loaded Successfully...")
 
@@ -179,42 +182,66 @@ async function getServiceDetails(web3, orgId, serviceId) {
     return serviceDetails;
 }
 
-async function getOrgServices(web3) {
+async function loadOrgServices(web3) {
 
     var RegistryContract = new web3.eth.Contract(RegistryAbi, RegistryAddress, {from: web3.eth.defaultAccount});
 
     //var orgId  = "0x736e657400000000000000000000000000000000000000000000000000000000"
 
     const orgIds = await getOrgnizations(web3)
-    
-    await async.forEach(orgIds, async (orgId) => {
 
-        //console.log("Organization Id - " + orgId)
-        //console.log("---------------------------")
+    for(var i=0;i<orgIds.length; i++) {
+        const orgId = orgIds[i]
+        console.log("Organization Id - " + orgId)
+        console.log("---------------------------")
 
         const serviceIds = await getOrganizationServices(web3, orgId)
 
-        //console.log("Service call...")
-
-        await async.forEach(serviceIds, async (serviceId) => { 
-
-            //console.log("service Id - " + serviceId)
+        for(var j=0; j< serviceIds.length;j++) {
+            const serviceId = serviceIds[j]
+            console.log("service Id - " + serviceId)
+            console.log("=================================")
 
             const serviceDetails = await getServiceDetails(web3,orgId, serviceId)
-
-            //console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
-            //console.log("***********************")
+            console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
+            console.log("***********************")
 
             var ipfsHash = web3.utils.hexToUtf8(serviceDetails.metadataURI).replace("ipfs://", "");
-
             var dataJSON = await getMetaDataFromIPFS(ipfsHash)
+            //console.log("payment_address - " + dataJSON.display_name);
 
-            console.log("payment_address - " + dataJSON.display_name);
+        }
+    }
 
-        });
+    // async forEach is not working as expected :(
+    // await async.forEach(orgIds, async (orgId) => {
+
+    //     //console.log("Organization Id - " + orgId)
+    //     //console.log("---------------------------")
+
+    //     const serviceIds = await getOrganizationServices(web3, orgId)
+
+    //     //console.log("Service call...")
+
+    //     await async.forEach(serviceIds, async (serviceId) => { 
+
+    //         //console.log("service Id - " + serviceId)
+
+    //         const serviceDetails = await getServiceDetails(web3,orgId, serviceId)
+
+    //         //console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
+    //         //console.log("***********************")
+
+    //         var ipfsHash = web3.utils.hexToUtf8(serviceDetails.metadataURI).replace("ipfs://", "");
+
+    //         var dataJSON = await getMetaDataFromIPFS(ipfsHash)
+
+    //         console.log("payment_address - " + dataJSON.display_name);
+
+    //     });
 
 
-    }); // For each Org Id
+    // }); // For each Org Id
 
     console.log("End of the Function call....")
     
@@ -224,7 +251,7 @@ async function getMetaDataFromIPFS(_ipfshash) {
 
     var ipfs  = ipfsClient({ host: '', port: 80, protocol: 'http' });
     
-    var dataJSON = null;
+    var dataJSON = null;   
 
     await ipfs.get(_ipfshash.trim(), async function (err, files) {
 
@@ -239,6 +266,7 @@ async function getMetaDataFromIPFS(_ipfshash) {
                 const paymentAddress = dataJSON.groups[0].payment_address
                 const serviceName = dataJSON.display_name
 
+                console.log("paymentAddress - " + paymentAddress)
             })
         }
         return dataJSON;   
