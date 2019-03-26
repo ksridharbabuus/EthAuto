@@ -16,6 +16,7 @@ let AGITokenAddress = "0xb97E9bBB6fd49865709d3F1576e8506ad640a13B"
 let MPEAddress = "0x7e6366fbe3bdfce3c906667911fc5237cc96bd08"
 let RegistryAddress = "0x5156fde2ca71da4398f8c76763c41bc9633875e4"
 
+var arrServiceDetails = []
 
 async function main() {
 
@@ -60,6 +61,12 @@ console.log("Current Provider - " + web3.currentProvider)
 
 
     console.log("Data Loaded Successfully...")
+
+    for(var i=0; i< arrServiceDetails.length; i++) {
+        console.log(arrServiceDetails[i])
+        console.log("---------------------------------------------------------------------------------")
+    }
+
 
     //approveToken(web3, 100000000000, pk1)
 
@@ -182,6 +189,8 @@ async function getServiceDetails(web3, orgId, serviceId) {
 
 async function loadOrgServices(web3) {
 
+    console.log("Loading data intiated...")
+
     var RegistryContract = new web3.eth.Contract(RegistryAbi, RegistryAddress, {from: web3.eth.defaultAccount});
 
     //var orgId  = "0x736e657400000000000000000000000000000000000000000000000000000000"
@@ -190,27 +199,41 @@ async function loadOrgServices(web3) {
 
     for(var i=0;i<orgIds.length; i++) {
         const orgId = orgIds[i]
-        console.log("Organization Id - " + orgId)
-        console.log("---------------------------")
+        //console.log("Organization Id - " + orgId)
+        //console.log("---------------------------")
 
         const serviceIds = await getOrganizationServices(web3, orgId)
 
         for(var j=0; j< serviceIds.length;j++) {
             const serviceId = serviceIds[j]
-            console.log("service Id - " + serviceId)
-            console.log("=================================")
+            // console.log("service Id - " + serviceId)
+            // console.log("=================================")
 
             const serviceDetails = await getServiceDetails(web3,orgId, serviceId)
-            console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
-            console.log("***********************")
+            // console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
+            // console.log("***********************")
 
             var ipfsHash = web3.utils.hexToUtf8(serviceDetails.metadataURI).replace("ipfs://", "");
 
-            //var dataJSON = await getMetaDataFromIPFS(ipfsHash)
-            var dataJSON = await getMetaDataFromIPFS(ipfsHash)
-            if(dataJSON.display_name) {
-                //console.log("dataJSON payment_address - " + dataJSON.display_name);
+            try {
+                //var dataJSON = await getMetaDataFromIPFS(ipfsHash)
+                var dataJSON = await getMetaDataFromIPFS(ipfsHash)
+                if(dataJSON.display_name) {
+                    //console.log("dataJSON payment_address - " + dataJSON.display_name);
+
+                    var obj = {
+                        "orgId": orgId,
+                        "serviceId": serviceId,
+                        "displayName": dataJSON.display_name,
+                        "paymentAddress": dataJSON.groups[0].payment_address,
+                        "ipfsHash": ipfsHash,
+                    }
+                    arrServiceDetails.push(obj)
+                }
+            } catch(error) {
+                console.error("Error while fetch IPFS Data for - " + ipfsHash)
             }
+            
         }
     }
 
