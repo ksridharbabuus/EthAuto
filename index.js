@@ -116,8 +116,6 @@ function createAccount(web3) {
 
 }
 
-
-
 function transferEther(web3, weiAmount, fromAccount_pk, toAccount) {
 
     // Gas Limits are hard coded we need to get it frm estimated gas
@@ -207,9 +205,12 @@ async function loadOrgServices(web3) {
             console.log("***********************")
 
             var ipfsHash = web3.utils.hexToUtf8(serviceDetails.metadataURI).replace("ipfs://", "");
-            var dataJSON = await getMetaDataFromIPFS(ipfsHash)
-            //console.log("payment_address - " + dataJSON.display_name);
 
+            //var dataJSON = await getMetaDataFromIPFS(ipfsHash)
+            var dataJSON = await getMetaDataFromIPFS(ipfsHash)
+            if(dataJSON.display_name) {
+                //console.log("dataJSON payment_address - " + dataJSON.display_name);
+            }
         }
     }
 
@@ -253,24 +254,53 @@ async function getMetaDataFromIPFS(_ipfshash) {
     
     var dataJSON = null;   
 
-    await ipfs.get(_ipfshash.trim(), async function (err, files) {
+    //const ipfsPromise = await ipfs.get(_ipfshash.trim())
 
-        if(files) {
+    let ipfsPromise = new Promise((resolve, reject) => {
 
-             await files.forEach( async (file) => {
+        ipfs.get(_ipfshash.trim(), function (err, files) {
 
-                var resString = file.content.toString('utf8')
-                //console.log("resString - " + resString) 
-                dataJSON = JSON.parse(resString)
+                if(err) {
+                    reject(err)
+                }
+                if(files) {
+                    files.forEach( async (file) => {
 
-                const paymentAddress = dataJSON.groups[0].payment_address
-                const serviceName = dataJSON.display_name
+                        var resString = file.content.toString('utf8')
+                        //console.log("resString - " + resString) 
+                        dataJSON = JSON.parse(resString)
 
-                console.log("paymentAddress - " + paymentAddress)
+                        //const paymentAddress = dataJSON.groups[0].payment_address
+                        //const serviceName = dataJSON.display_name
+
+                        //console.log("paymentAddress - " + paymentAddress)
+                        resolve(dataJSON)
+                    })
+                }
             })
-        }
-        return dataJSON;   
     })
+
+    let result = await ipfsPromise;
+
+    return result;
+    // await ipfs.get(_ipfshash.trim(), async function (err, files) {
+
+    //     if(files) {
+
+    //          await files.forEach( async (file) => {
+
+    //             var resString = file.content.toString('utf8')
+    //             //console.log("resString - " + resString) 
+    //             dataJSON = JSON.parse(resString)
+
+    //             const paymentAddress = dataJSON.groups[0].payment_address
+    //             const serviceName = dataJSON.display_name
+
+    //             console.log("paymentAddress - " + paymentAddress)
+    //         })
+    //     }
+    //     return dataJSON;   
+    // })
 
 }
 
