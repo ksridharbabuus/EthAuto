@@ -20,6 +20,8 @@ var arrServiceDetails = []
 
 async function main() {
 
+
+
     // Ropsten Keys
     const pk = ""
     const totalAccounts2Create = 1;
@@ -42,10 +44,7 @@ async function main() {
     
     //const web3 = new Web3('http://localhost:8545');
     const web3 = new Web3('https://ropsten.infura.io');
-
-console.log("Current Provider - " + web3.currentProvider)
-
-    
+   
     // web3.eth.net.getId().then((netId) => {
     //     console.log("Network Id - " + netId);
     // })
@@ -56,13 +55,11 @@ console.log("Current Provider - " + web3.currentProvider)
             console.log("Eth Balance - " + bal);
     })
 
-
     console.log("Data Loaded Initiated...")
     await loadOrgServices(web3);
     console.log("Data Loaded Successfully...")
 
-    for(a=0;a<totalAccounts2Create;a++) {
-
+    for(var a=0;a<totalAccounts2Create;a++) {
         // Set Default Account to Base Account
         validateAndSetDefaultAccount(web3, pk)
 
@@ -76,15 +73,14 @@ console.log("Current Provider - " + web3.currentProvider)
 
         // Get each service and create a channel
         for(var i=0; i< arrServiceDetails.length; i++) {
-
             if(arrServiceDetails[i].paymentAddress && arrServiceDetails[i].groupId) {
                 console.log("---------------------------------------------------------------------------------")
                 console.log(arrServiceDetails[i])
 
                 // *** TODO Need to check base64 decode before passing it to Contract Call
 
-                const groupId = Buffer.from(arrServiceDetails[i].groupId, 'base64').toString('hex')
-                const groupIdInBytes = web3.utils.fromAscii(groupId)
+                //const groupId = Buffer.from(arrServiceDetails[i].groupId, 'base64').toString('hex')
+                const groupIdInHex = base64ToHex(arrServiceDetails[i].groupId)//web3.utils.fromAscii(groupId)
 
                 // Set the default Account to new Account
                 validateAndSetDefaultAccount(web3, newAccount_pk)
@@ -92,7 +88,7 @@ console.log("Current Provider - " + web3.currentProvider)
                 console.log("Opening channel for service..." + arrServiceDetails[i].displayName)
 
                 // Create a channel
-                await createChannel(web3, 0, newAccount_pk, arrServiceDetails[i].paymentAddress, groupIdInBytes, expirationBlock)
+                await createChannel(web3, 0, newAccount_pk, arrServiceDetails[i].paymentAddress, groupIdInHex, expirationBlock)
 
                 console.log("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
 
@@ -132,6 +128,13 @@ console.log("Current Provider - " + web3.currentProvider)
     // writeToContract(web3)
     
 }
+
+function base64ToHex(base64String) {
+    var byteSig = Buffer.from(base64String, 'base64');
+    let buff = new Buffer(byteSig);
+    let hexString = "0x"+buff.toString('hex');
+    return hexString;
+  }
 
 function validateAndSetDefaultAccount(web3, pk) {
 
@@ -368,9 +371,7 @@ async function getOrganizationServices(web3, orgId) {
 async function getServiceDetails(web3, orgId, serviceId) {
 
     var RegistryContract = new web3.eth.Contract(RegistryAbi, RegistryAddress, {from: web3.eth.defaultAccount});
-
     const serviceDetails = await RegistryContract.methods.getServiceRegistrationById(orgId, serviceId).call()
-    
     return serviceDetails;
 }
 
@@ -383,21 +384,21 @@ async function loadOrgServices(web3) {
     //var orgId  = "0x736e657400000000000000000000000000000000000000000000000000000000"
 
     const orgIds = await getOrgnizations(web3)
-
     for(var i=0;i<orgIds.length; i++) {
         const orgId = orgIds[i]
-        //console.log("Organization Id - " + orgId)
+//console.log("Organization Id - " + orgId)
         //console.log("---------------------------")
 
         const serviceIds = await getOrganizationServices(web3, orgId)
-
+//console.log("serviceIds.length - " + serviceIds.length)
         for(var j=0; j< serviceIds.length;j++) {
             const serviceId = serviceIds[j]
-            // console.log("service Id - " + serviceId)
+//console.log("service Id - " + serviceId)
             // console.log("=================================")
 
             const serviceDetails = await getServiceDetails(web3,orgId, serviceId)
-            // console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
+//console.log(serviceDetails)            
+            console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
             // console.log("***********************")
 
             var ipfsHash = web3.utils.hexToUtf8(serviceDetails.metadataURI).replace("ipfs://", "");
