@@ -17,15 +17,15 @@ let MPEAddress = "0x7e6366fbe3bdfce3c906667911fc5237cc96bd08"
 let RegistryAddress = "0x5156fde2ca71da4398f8c76763c41bc9633875e4"
 
 var arrServiceDetails = []
+var newAccounts = []
 
 async function main() {
-
-
 
     // Ropsten Keys
     const pk = ""
     const totalAccounts2Create = 1;
     const ethInWei = 100000000000000000             // 0.1 Eth (17 Zeros after 1)
+    const AGIWei = 10000000                         // 0.1 AGI (7 Zeros after 1)
     const expirationBlock = 9287016
 
     console.log("initiating the script for automation...")
@@ -59,6 +59,9 @@ async function main() {
     await loadOrgServices(web3);
     console.log("Data Loaded Successfully...")
 
+    var currentChannelId = await getCurrentChannelId(web3)
+    //console.log("currentChannelId - " + currentChannelId)
+
     for(var a=0;a<totalAccounts2Create;a++) {
         // Set Default Account to Base Account
         validateAndSetDefaultAccount(web3, pk)
@@ -67,6 +70,9 @@ async function main() {
         var newAccount = createAccount(web3)
         var newAccount_pk = newAccount.privateKey
         newAccount_pk = newAccount_pk.substring(2, newAccount_pk.length)
+
+        // Store Accounts in the Array for Future reference
+        newAccounts[newAccount.address] = newAccount_pk
 
         // Transfer Ether to the newly created Account
         await transferEther(web3, ethInWei, pk, newAccount.address);  //0xa5520765200F78B91e830fc023c0499ae3c73a09
@@ -98,10 +104,26 @@ async function main() {
 
         // Adding Funds to the channel
         // Set the default Account to new Account
-        //validateAndSetDefaultAccount(web3, pk)
+        validateAndSetDefaultAccount(web3, pk)
 
-        // Add Funds to the Channels created now
-        //await addFundsToChannel(web3, AGIWeiAmount, pk, channelId)
+        var newChannelId = await getCurrentChannelId(web3)
+        //console.log("newChannelId - " + newChannelId)
+        console.log("Adding funds to channel is initiated......")
+        console.log("------------------------------------------")
+        for(var id=currentChannelId; id<newChannelId; id++) {
+
+            console.log("Getting Details for channel Id: " + id)
+            const channelDetails = await getChannelDetails(web3,id)
+
+            // Check whether this channel is created by this Prog
+            if(newAccounts[channelDetails.sender]) {
+                console.log("Adding funds to the Channel Id - " + id)
+                // Add Funds to the Channels created now
+                await addFundsToChannel(web3, AGIWei, pk, id)      
+            }
+
+        }
+        console.log("------------------------------------------")
 
     }
 
@@ -131,8 +153,8 @@ async function main() {
 
 function base64ToHex(base64String) {
     var byteSig = Buffer.from(base64String, 'base64');
-    let buff = new Buffer(byteSig);
-    let hexString = "0x"+buff.toString('hex');
+    //let buff = new Buffer(byteSig);
+    let hexString = "0x"+byteSig.toString('hex');
     return hexString;
   }
 
@@ -178,7 +200,7 @@ async function approveToken(web3, weiAmount, fromAccount_pk) {
     var account = web3.eth.accounts.privateKeyToAccount("0x" + fromAccount_pk);
     var TokenContract = new web3.eth.Contract(AGITokenAbi, AGITokenAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
 
-    const privateKey = new Buffer(fromAccount_pk, 'hex')
+    const privateKey = Buffer.from(fromAccount_pk, 'hex')
 
     TokenContract.methods.balanceOf(web3.eth.defaultAccount).call({from: web3.eth.defaultAccount}, (error, result) => {
         console.log("token balance - " + result);
@@ -224,7 +246,7 @@ async function transferEther(web3, weiAmount, fromAccount_pk, toAccount) {
 
     // Gas Limits are hard coded we need to get it frm estimated gas
 
-    const privateKey = new Buffer(fromAccount_pk, 'hex')
+    const privateKey = Buffer.from(fromAccount_pk, 'hex')
 
     var account = web3.eth.accounts.privateKeyToAccount('0x' + fromAccount_pk);
     var nonce ;
@@ -270,7 +292,7 @@ async function depositToken(web3, AGIAmount, fromAccount_pk) {
 
     var MPEContract = new web3.eth.Contract(MPEAbi, MPEAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
 
-    const privateKey = new Buffer(fromAccount_pk, 'hex')
+    const privateKey = Buffer.from(fromAccount_pk, 'hex')
 
     const query = MPEContract.methods.deposit(AGIAmount);
     const encodedABI = query.encodeABI();
@@ -303,8 +325,43 @@ async function depositToken(web3, AGIAmount, fromAccount_pk) {
 
 }
 
-function getMPEBalance() {
+async function addFundsToChannel(web3, AGIWeiAmount, fromAccount_pk, channelId) {
 
+    var account = web3.eth.accounts.privateKeyToAccount("0x" + fromAccount_pk);
+    //var TokenContract = new web3.eth.Contract(AGITokenAbi, AGITokenAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
+
+    var MPEContract = new web3.eth.Contract(MPEAbi, MPEAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
+
+    const privateKey = Buffer.from(fromAccount_pk, 'hex')
+
+    const query = MPEContract.methods.channelAddFunds(channelId, AGIWeiAmount);
+    const encodedABI = query.encodeABI();
+
+    var nonce = await web3.eth.getTransactionCount(account.address)
+
+    const rawTx = {
+        nonce: nonce,
+        gasPrice: "0x098bca5a00",
+        gasLimit: 2100000,
+        to: MPEAddress,
+        value: 0,
+        data: encodedABI,
+        }
+
+    const tx = new Tx(rawTx);
+    tx.sign(privateKey);
+
+    const serializedTx = tx.serialize();
+
+    try {
+
+        var txnHash = await web3.eth.sendSignedTransaction('0x' + serializedTx.toString('hex'))
+        console.log("Txn Add AGI to Channel is submitted to network - " + txnHash)
+
+    } catch(error) {
+        console.error("Error while Adding AGI to Channel to MPE contract address - " + MPEAddress)
+        //console.log(error)
+    }
 }
 
 async function createChannel(web3, AGIAmount, fromAccount_pk, recipientAddress, groupId, expirationBlockNumber) {
@@ -316,7 +373,7 @@ async function createChannel(web3, AGIAmount, fromAccount_pk, recipientAddress, 
 
     var MPEContract = new web3.eth.Contract(MPEAbi, MPEAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
 
-    const privateKey = new Buffer(fromAccount_pk, 'hex')
+    const privateKey = Buffer.from(fromAccount_pk, 'hex')
 
     const query = MPEContract.methods.openChannel(account.address, recipientAddress, groupId, AGIAmount, expirationBlockNumber);
     const encodedABI = query.encodeABI();
@@ -347,6 +404,26 @@ async function createChannel(web3, AGIAmount, fromAccount_pk, recipientAddress, 
         //console.log(error)
     }
 
+}
+
+async function getCurrentChannelId(web3) {
+    
+    var MPEContract = new web3.eth.Contract(MPEAbi, MPEAddress);
+
+    const nextChannelId = (await MPEContract.methods.nextChannelId.call())
+    
+    return nextChannelId;
+}
+
+async function getChannelDetails(web3, channelId) {
+
+    var MPEContract = new web3.eth.Contract(MPEAbi, MPEAddress);
+console.log("channelId - " + channelId)
+    const channelDetails = (await MPEContract.methods.channels(channelId).call())
+    
+console.log("channelDetails - " + JSON.stringify(channelDetails));
+
+    return channelDetails;
 }
 
 async function getOrgnizations(web3) {
