@@ -2,6 +2,8 @@ let AGITokenAbi = require("singularitynet-token-contracts/abi/SingularityNetToke
 let MPEAbi = require("singularitynet-platform-contracts/abi/MultiPartyEscrow.json")
 let RegistryAbi = require("singularitynet-platform-contracts/abi/Registry.json")
 var ipfsClient = require('ipfs-http-client')
+let fetch = require("node-fetch")
+let config = require("./config.json")
 
 //var async = require("async");
 
@@ -12,21 +14,56 @@ const Tx = require('ethereumjs-tx');
 //import {Eth} from 'web3-eth';
 
 // Ropsten Address
-let AGITokenAddress = "0xb97E9bBB6fd49865709d3F1576e8506ad640a13B" 
-let MPEAddress = "0x7e6366fbe3bdfce3c906667911fc5237cc96bd08"
-let RegistryAddress = "0x5156fde2ca71da4398f8c76763c41bc9633875e4"
+let AGITokenAddress = config.AGITokenAddress
+let MPEAddress = config.MPEAddress
+let RegistryAddress = config.RegistryAddress
+let CuratedServiceURL = config.CuratedServiceURL
 
 var arrServiceDetails = []
 var newAccounts = []
 
+async function loadCuratedOrgService() {
+
+    await fetch(CuratedServiceURL, { method: 'GET'})
+    .then(res => res.json())
+    .then(data => {
+
+        console.log(data)
+
+        console.log("Total Services - " + data.data.length)
+
+        if(data.status === "success") {
+
+            for(var i=0;i < data.data.length; i++) {
+
+                // console.log("Org Id - " + data.data[i].org_id + " - " + data.data[i].service_id + " - " + data.data[i].display_name + " - " + 
+                // data.data[i].groups.default_group.group_id + " - " + data.data[i].groups.default_group.payment_address + " - " + data.data[i].ipfs_hash)
+                // console.log("-------------------------------------------")
+
+                var obj = {
+                    "orgId": data.data[i].org_id,
+                    "serviceId": data.data[i].service_id,
+                    "displayName": data.data[i].display_name,
+                    "groupId": data.data[i].groups.default_group.group_id,
+                    "paymentAddress": data.data[i].groups.default_group.payment_address,
+                    "ipfsHash": data.data[i].ipfs_hash,
+                }
+                arrServiceDetails.push(obj)
+            }
+        }
+    })
+    .catch(err => console.log("Error loading the from service - " + err));
+
+}
+
 async function main() {
 
     // Ropsten Keys
-    const pk = ""
-    const totalAccounts2Create = 1;
-    const ethInWei = 100000000000000000             // 0.1 Eth (17 Zeros after 1)
-    const AGIWei = 10000000                         // 0.1 AGI (7 Zeros after 1)
-    const expirationBlock = 9287016
+    const pk = config.PK;
+    const totalAccounts2Create = config.TotalAccounts2Create;
+    const ethInWei = config.EthInWei                     // 0.1 Eth (17 Zeros after 1)
+    const AGIWei = config.AGIWei                         // 0.1 AGI (7 Zeros after 1)
+    const expirationBlock = config.ExpirationBlock
 
     console.log("initiating the script for automation...")
 
@@ -43,7 +80,7 @@ async function main() {
     
     
     //const web3 = new Web3('http://localhost:8545');
-    const web3 = new Web3('https://ropsten.infura.io');
+    const web3 = new Web3(config.InfuraURL);
    
     // web3.eth.net.getId().then((netId) => {
     //     console.log("Network Id - " + netId);
@@ -56,7 +93,8 @@ async function main() {
     })
 
     console.log("Data Loaded Initiated...")
-    await loadOrgServices(web3);
+    //await loadOrgServices(web3);  // Loads the data from the Blockchain
+    await loadCuratedOrgService();  // Loads the data from the API Service call
     console.log("Data Loaded Successfully...")
 
     var currentChannelId = await getCurrentChannelId(web3)
@@ -539,7 +577,7 @@ async function loadOrgServices(web3) {
 
 async function getMetaDataFromIPFS(_ipfshash) {
 
-    var ipfs  = ipfsClient({ host: '', port: 80, protocol: 'http' });
+    var ipfs  = ipfsClient({ host: 'ipfs.singularitynet.io', port: 80, protocol: 'http' });
     
     var dataJSON = null;   
 

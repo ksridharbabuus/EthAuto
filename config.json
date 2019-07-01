@@ -1,0 +1,12 @@
+{
+    "TotalAccounts2Create":1,
+    "EthInWei":100000000000000000, 
+    "AGIWei":10000000,
+    "ExpirationBlock":9287016,
+    "PK":"",
+    "InfuraURL": "https://ropsten.infura.io",
+    "AGITokenAddress":"0xb97E9bBB6fd49865709d3F1576e8506ad640a13B",
+    "MPEAddress":"0x7e6366fbe3bdfce3c906667911fc5237cc96bd08",
+    "RegistryAddress":"0x5156fde2ca71da4398f8c76763c41bc9633875e4",
+    "CuratedServiceURL": ""
+}
