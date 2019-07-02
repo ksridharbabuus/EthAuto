@@ -6,12 +6,20 @@ let fetch = require("node-fetch")
 let config = require("./config.json")
 
 //var async = require("async");
-
 let contractJSON = "" //require('./contracts/SimpleStorage.json')
 var Web3 = require('web3')
 const Tx = require('ethereumjs-tx');
 
+const AWS = require("aws-sdk")
+
 //import {Eth} from 'web3-eth';
+
+
+// AWS Configuration
+const region = config.AWSRegion
+const ssmVersion = config.SSMVersion
+AWS.config.update({ region })
+const ssm = new AWS.SSM({ "apiVersion": ssmVersion })
 
 // Ropsten Address
 let AGITokenAddress = config.AGITokenAddress
@@ -21,40 +29,6 @@ let CuratedServiceURL = config.CuratedServiceURL
 
 var arrServiceDetails = []
 var newAccounts = []
-
-async function loadCuratedOrgService() {
-
-    await fetch(CuratedServiceURL, { method: 'GET'})
-    .then(res => res.json())
-    .then(data => {
-
-        console.log(data)
-
-        console.log("Total Services - " + data.data.length)
-
-        if(data.status === "success") {
-
-            for(var i=0;i < data.data.length; i++) {
-
-                // console.log("Org Id - " + data.data[i].org_id + " - " + data.data[i].service_id + " - " + data.data[i].display_name + " - " + 
-                // data.data[i].groups.default_group.group_id + " - " + data.data[i].groups.default_group.payment_address + " - " + data.data[i].ipfs_hash)
-                // console.log("-------------------------------------------")
-
-                var obj = {
-                    "orgId": data.data[i].org_id,
-                    "serviceId": data.data[i].service_id,
-                    "displayName": data.data[i].display_name,
-                    "groupId": data.data[i].groups.default_group.group_id,
-                    "paymentAddress": data.data[i].groups.default_group.payment_address,
-                    "ipfsHash": data.data[i].ipfs_hash,
-                }
-                arrServiceDetails.push(obj)
-            }
-        }
-    })
-    .catch(err => console.log("Error loading the from service - " + err));
-
-}
 
 async function main() {
 
@@ -114,6 +88,10 @@ async function main() {
 
         // Transfer Ether to the newly created Account
         await transferEther(web3, ethInWei, pk, newAccount.address);  //0xa5520765200F78B91e830fc023c0499ae3c73a09
+
+        // Store Account and Key into the AWS Key Store
+        // TODO: Need to call Key Store only after successfuly transfer of Ether, Depends on Web3 1.0 Bug Fix
+        await storeParameter(newAccount.address, newAccount_pk)
 
         // Get each service and create a channel
         for(var i=0; i< arrServiceDetails.length; i++) {
@@ -187,6 +165,40 @@ async function main() {
     // readFromContract(web3)
     // writeToContract(web3)
     
+}
+
+async function loadCuratedOrgService() {
+
+    await fetch(CuratedServiceURL, { method: 'GET'})
+    .then(res => res.json())
+    .then(data => {
+
+        //console.log(data)
+
+        console.log("Total Services - " + data.data.length)
+
+        if(data.status === "success") {
+
+            for(var i=0;i < data.data.length; i++) {
+
+                // console.log("Org Id - " + data.data[i].org_id + " - " + data.data[i].service_id + " - " + data.data[i].display_name + " - " + 
+                // data.data[i].groups.default_group.group_id + " - " + data.data[i].groups.default_group.payment_address + " - " + data.data[i].ipfs_hash)
+                // console.log("-------------------------------------------")
+
+                var obj = {
+                    "orgId": data.data[i].org_id,
+                    "serviceId": data.data[i].service_id,
+                    "displayName": data.data[i].display_name,
+                    "groupId": data.data[i].groups.default_group.group_id,
+                    "paymentAddress": data.data[i].groups.default_group.payment_address,
+                    "ipfsHash": data.data[i].ipfs_hash,
+                }
+                arrServiceDetails.push(obj)
+            }
+        }
+    })
+    .catch(err => console.log("Error loading the from service - " + err));
+
 }
 
 function base64ToHex(base64String) {
@@ -462,10 +474,10 @@ async function getCurrentChannelId(web3) {
 async function getChannelDetails(web3, channelId) {
 
     var MPEContract = new web3.eth.Contract(MPEAbi, MPEAddress);
-console.log("channelId - " + channelId)
+    console.log("channelId - " + channelId)
     const channelDetails = (await MPEContract.methods.channels(channelId).call())
     
-console.log("channelDetails - " + JSON.stringify(channelDetails));
+    console.log("channelDetails - " + JSON.stringify(channelDetails));
 
     return channelDetails;
 }
@@ -507,18 +519,19 @@ async function loadOrgServices(web3) {
     const orgIds = await getOrgnizations(web3)
     for(var i=0;i<orgIds.length; i++) {
         const orgId = orgIds[i]
-//console.log("Organization Id - " + orgId)
+        //console.log("Organization Id - " + orgId)
         //console.log("---------------------------")
 
         const serviceIds = await getOrganizationServices(web3, orgId)
-//console.log("serviceIds.length - " + serviceIds.length)
+        //console.log("serviceIds.length - " + serviceIds.length)
+
         for(var j=0; j< serviceIds.length;j++) {
             const serviceId = serviceIds[j]
-//console.log("service Id - " + serviceId)
+            //console.log("service Id - " + serviceId)
             // console.log("=================================")
 
             const serviceDetails = await getServiceDetails(web3,orgId, serviceId)
-//console.log(serviceDetails)            
+            //console.log(serviceDetails)            
             console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
             // console.log("***********************")
 
@@ -546,36 +559,6 @@ async function loadOrgServices(web3) {
             
         }
     }
-
-    // async forEach is not working as expected :(
-    // await async.forEach(orgIds, async (orgId) => {
-
-    //     //console.log("Organization Id - " + orgId)
-    //     //console.log("---------------------------")
-
-    //     const serviceIds = await getOrganizationServices(web3, orgId)
-
-    //     //console.log("Service call...")
-
-    //     await async.forEach(serviceIds, async (serviceId) => { 
-
-    //         //console.log("service Id - " + serviceId)
-
-    //         const serviceDetails = await getServiceDetails(web3,orgId, serviceId)
-
-    //         //console.log(web3.utils.hexToUtf8(serviceDetails.metadataURI))
-    //         //console.log("***********************")
-
-    //         var ipfsHash = web3.utils.hexToUtf8(serviceDetails.metadataURI).replace("ipfs://", "");
-
-    //         var dataJSON = await getMetaDataFromIPFS(ipfsHash)
-
-    //         console.log("payment_address - " + dataJSON.display_name);
-
-    //     });
-
-
-    // }); // For each Org Id
 
     console.log("End of the Function call....")
     
@@ -616,55 +599,40 @@ async function getMetaDataFromIPFS(_ipfshash) {
     let result = await ipfsPromise;
 
     return result;
-    // await ipfs.get(_ipfshash.trim(), async function (err, files) {
-
-    //     if(files) {
-
-    //          await files.forEach( async (file) => {
-
-    //             var resString = file.content.toString('utf8')
-    //             //console.log("resString - " + resString) 
-    //             dataJSON = JSON.parse(resString)
-
-    //             const paymentAddress = dataJSON.groups[0].payment_address
-    //             const serviceName = dataJSON.display_name
-
-    //             console.log("paymentAddress - " + paymentAddress)
-    //         })
-    //     }
-    //     return dataJSON;   
-    // })
 
 }
 
+async function storeParameter(account, value) {
 
-//***********************************to be removed ********************************************************** */
+    const parameterName = config.ParameterPrefix + account
+    var params = {
+        Name: parameterName, 
+        Type: 'String', 
+        Value: value, 
+        Overwrite: false,
+      };
+    
+      console.log("Initiared the Key Store for parameter - " + parameterName)
+      await ssm.putParameter(params, function(err, data) {
+        if (err) console.log(err, err.stack); // an error occurred
+        else     console.log("Successfully Stored Key Value for the account!" + data);           // successful response
+      });
 
-// function readFromContract(web3) {
-//     console.log("web3.eth.defaultAccount - " + web3.eth.defaultAccount)
-//     const simpleStorageContractAddress = "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24"
-//     var simpleStorageContract = new web3.eth.Contract(contractJSON.abi, simpleStorageContractAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
+}
 
-//     console.log("simpleStorageContract - " + simpleStorageContract)
+async function getParameter(account) {
 
-//     simpleStorageContract.methods.storedData().call({from: web3.eth.defaultAccount}, (error, result) => {
-//         console.log("result - " + result);
-//     });
-// }
-
-// function writeToContract(web3) {
-
-//     console.log("web3.eth.defaultAccount - " + web3.eth.defaultAccount)
-//     const simpleStorageContractAddress = "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24"
-//     var simpleStorageContract = new web3.eth.Contract(contractJSON.abi, simpleStorageContractAddress, {gasPrice: '10000000', from: web3.eth.defaultAccount});
-
-//     console.log("simpleStorageContract - " + simpleStorageContract)
-
-//     simpleStorageContract.methods.set(123).send({from: web3.eth.defaultAccount})
-//     .on('transactionHash', (hash) => { console.log("hash - " + hash)})
-//     .on('receipt', (receipt) => { console.log("receipt - " + receipt)})
-
-// }
-
+    const parameterName = config.ParameterPrefix + account
+    var params = {
+        Name: parameterName,
+        WithDecryption: false
+      };
+    
+      console.log("Getting from Key Store for parameter - " + parameterName)
+      await ssm.getParameter(params, function(err, data) {
+        if (err) console.log(err, err.stack); // an error occurred
+        else     console.log("Key Store String - " + JSON.stringify(data));           // successful response
+      });
+}
 
 main();
