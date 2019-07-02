@@ -64,7 +64,7 @@ async function main() {
     const ethInWei = config.EthInWei                     // 0.1 Eth (17 Zeros after 1)
     const AGIWei = config.AGIWei                         // 0.1 AGI (7 Zeros after 1)
     const expirationBlock = config.ExpirationBlock
-
+    const signerAddress = config.SignerAddress
     console.log("initiating the script for automation...")
 
     // const options = {
@@ -132,7 +132,7 @@ async function main() {
                 console.log("Opening channel for service..." + arrServiceDetails[i].displayName)
 
                 // Create a channel
-                await createChannel(web3, 0, newAccount_pk, arrServiceDetails[i].paymentAddress, groupIdInHex, expirationBlock)
+                await createChannel(web3, 0, newAccount_pk, arrServiceDetails[i].paymentAddress, groupIdInHex, expirationBlock, signerAddress)
 
                 console.log("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
 
@@ -402,7 +402,7 @@ async function addFundsToChannel(web3, AGIWeiAmount, fromAccount_pk, channelId) 
     }
 }
 
-async function createChannel(web3, AGIAmount, fromAccount_pk, recipientAddress, groupId, expirationBlockNumber) {
+async function createChannel(web3, AGIAmount, fromAccount_pk, recipientAddress, groupId, expirationBlockNumber, signerAddress) {
 
     //address signer, address recipient, bytes32 groupId, uint256 value, uint256 expiration
 
@@ -413,7 +413,13 @@ async function createChannel(web3, AGIAmount, fromAccount_pk, recipientAddress, 
 
     const privateKey = Buffer.from(fromAccount_pk, 'hex')
 
-    const query = MPEContract.methods.openChannel(account.address, recipientAddress, groupId, AGIAmount, expirationBlockNumber);
+    var _signerAddress = signerAddress;
+    if(signerAddress === "" || signerAddress === "self") {
+        _signerAddress = account.address
+    }
+
+    // Can be a different signer address as well
+    const query = MPEContract.methods.openChannel(_signerAddress, recipientAddress, groupId, AGIAmount, expirationBlockNumber);
     const encodedABI = query.encodeABI();
 
     var nonce = await web3.eth.getTransactionCount(account.address)
