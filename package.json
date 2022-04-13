@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/ksridharbabuus/EthAuto#readme",
   "dependencies": {
-    "async": "^2.6.2",
+    "async": "^3.2.2",
     "aws-sdk": "^2.486.0",
     "ethereumjs-tx": "^1.3.7",
     "forEachAsync": "^3.0.0",
